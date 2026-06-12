@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>HELM — MLOps Model Control Plane · console</title>
+<style>
+  :root { --bg:#0b0e14; --panel:#11151f; --line:#1f2533; --txt:#d7dce5; --dim:#7a8499; --acc:#5eead4; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt);
+         font:14px/1.55 ui-monospace,'SF Mono',Menlo,Consolas,monospace; }
+  header { padding:20px 28px; border-bottom:1px solid var(--line); }
+  h1 { margin:0; font-size:16px; letter-spacing:.4px; }
+  h1 span { color:var(--acc); }
+  .sub { color:var(--dim); font-size:12px; margin-top:4px; }
+  main { display:grid; grid-template-columns:380px 1fr; gap:0; min-height:calc(100vh - 67px); }
+  .left { border-right:1px solid var(--line); padding:20px; }
+  .right { padding:20px; }
+  label { display:block; font-size:11px; color:var(--dim); text-transform:uppercase;
+           letter-spacing:.8px; margin:14px 0 6px; }
+  select,textarea,input { width:100%; background:var(--panel); color:var(--txt);
+    border:1px solid var(--line); border-radius:6px; padding:9px 10px; font:inherit; }
+  textarea { min-height:140px; resize:vertical; }
+  button { margin-top:14px; width:100%; padding:10px; border:0; border-radius:6px;
+    background:var(--acc); color:#06251f; font:inherit; font-weight:700; cursor:pointer; }
+  button:hover { filter:brightness(1.08); }
+  pre { background:var(--panel); border:1px solid var(--line); border-radius:8px;
+        padding:14px; white-space:pre-wrap; word-break:break-word; min-height:200px; }
+  .hint { color:var(--dim); font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>HELM — MLOps Model Control Plane <span>// live API console</span></h1>
+  <div class="sub">Same-origin console for the FastAPI core · interactive docs at <a style="color:var(--acc)" href="/docs">/docs</a></div>
+</header>
+<main>
+  <div class="left">
+    <label>Endpoint</label>
+    <select id="ep"></select>
+    <label>Request body (JSON)</label>
+    <textarea id="body" spellcheck="false"></textarea>
+    <button id="send">Send request</button>
+    <p class="hint">Presets are the blueprint smoke cases — edit freely.</p>
+  </div>
+  <div class="right">
+    <label>Response</label>
+    <pre id="out">→ pick an endpoint and hit send</pre>
+  </div>
+</main>
+<script>
+const SMOKE = [
+  {
+    "method": "post",
+    "path": "/api/models",
+    "json": {
+      "name": "churn",
+      "version": "1.2.0",
+      "metrics": {
+        "auc": 0.91
+      },
+      "baseline_distribution": [
+        5,
+        10,
+        20,
+        25,
+        15,
+        10,
+        7,
+        4,
+        3,
+        1
+      ]
+    }
+  },
+  {
+    "method": "post",
+    "path": "/api/models/churn/promote"
+  },
+  {
+    "method": "post",
+    "path": "/api/drift",
+    "json": {
+      "name": "churn",
+      "live_distribution": [
+        2,
+        6,
+        14,
+        22,
+        20,
+        14,
+        10,
+        6,
+        4,
+        2
+      ]
+    }
+  }
+];
+const ep = document.getElementById('ep'), body = document.getElementById('body'),
+      out = document.getElementById('out');
+SMOKE.forEach((c,i) => {
+  const o = document.createElement('option');
+  o.value = i; o.textContent = c.method.toUpperCase() + ' ' + c.path;
+  ep.appendChild(o);
+});
+function load() {
+  const c = SMOKE[ep.value || 0];
+  body.value = c && c.json ? JSON.stringify(c.json, null, 2) : '';
+}
+ep.onchange = load; load();
+document.getElementById('send').onclick = async () => {
+  const c = SMOKE[ep.value || 0];
+  out.textContent = '… calling ' + c.path;
+  try {
+    const opts = { method: c.method.toUpperCase(), headers: {'Content-Type':'application/json'} };
+    if (body.value.trim()) opts.body = body.value;
+    const r = await fetch(c.path, opts);
+    const t = await r.text();
+    try { out.textContent = r.status + '\n\n' + JSON.stringify(JSON.parse(t), null, 2); }
+    catch (_) { out.textContent = r.status + '\n\n' + t; }
+  } catch (e) { out.textContent = 'request failed: ' + e; }
+};
+</script>
+</body>
+</html>
